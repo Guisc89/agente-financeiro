@@ -1,0 +1,15 @@
+# Segredos (NUNCA publicar)
+.env
+.streamlit/secrets.toml
+
+# Ambiente virtual (cada pessoa cria o seu)
+.venv/
+venv/
+
+# Python interno
+__pycache__/
+*.py[cod]
+
+# Configurações locais de IDE
+.vscode/
+.idea/
