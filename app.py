@@ -4,6 +4,14 @@ from providers import YahooFinanceProvider
 from llm_providers import GroqClient
 from agent_core import FinancialAgent
 
+import os
+
+try:
+    if "GROQ_API_KEY" in st.secrets:
+        os.environ.setdefault("GROQ_API_KEY", st.secrets["GROQ_API_KEY"])
+except Exception:
+    pass
+
 NOME_APP = "Bússola Capital"
 TAGLINE = "Inteligência para investir"
 
