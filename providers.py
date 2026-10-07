@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 import json
 import os
 from typing import List, Optional
-from urllib.parse import quote
 from urllib.error import HTTPError
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 import yfinance as yf
@@ -46,6 +46,32 @@ class BrapiProvider(DataProvider):
     """Implementação usando a API de cotações da Brapi para ativos da B3."""
 
     source_name = "Brapi"
+
+    def list_b3_assets(self, asset_type: str) -> List[dict]:
+        filters = {
+            "stock": {"type": "stock", "subType": "stock"},
+            "fii": {"type": "fund", "subType": "fii"},
+        }
+        if asset_type not in filters:
+            raise ValueError(f"Tipo de ativo não suportado: {asset_type}")
+
+        params = {**filters[asset_type], "limit": 2000}
+        url = f"https://brapi.dev/api/quote/list?{urlencode(params)}"
+        request = Request(url, headers={"Accept": "application/json"})
+        try:
+            with urlopen(request, timeout=15) as response:
+                payload = json.load(response)
+        except Exception as e:
+            raise ValueError(f"Erro ao listar ativos da B3 na Brapi: {e}") from e
+
+        return [
+            {
+                "ticker": item["stock"].upper(),
+                "name": item.get("name") or item["stock"],
+            }
+            for item in payload.get("stocks", [])
+            if item.get("stock")
+        ]
 
     def get_asset_quote(self, ticker: str) -> AssetQuote:
         brapi_ticker = ticker.upper().removesuffix(".SA")

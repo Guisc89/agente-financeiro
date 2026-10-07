@@ -1,6 +1,6 @@
 import streamlit as st
 import datetime as dt
-from providers import FallbackDataProvider
+from providers import BrapiProvider, FallbackDataProvider
 from llm_providers import GroqClient
 from agent_core import FinancialAgent
 
@@ -569,6 +569,17 @@ def buscar_dados(ticker: str):
     return provider.get_asset_quote(ticker)
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def listar_ativos_b3(tipo: str):
+    return BrapiProvider().list_b3_assets(tipo)
+
+
+def sincronizar_ticker_selecionado(chave_widget: str):
+    ticker = st.session_state.get(chave_widget)
+    if ticker:
+        st.session_state["ticker_input"] = f"{ticker}.SA"
+
+
 @st.cache_resource(show_spinner=False)
 def criar_agente():
     return FinancialAgent(
@@ -641,6 +652,9 @@ def mercado_ativo(ticker: str) -> str:
 # ============================================================
 # BARRA LATERAL
 # ============================================================
+if "ticker_input" not in st.session_state:
+    st.session_state["ticker_input"] = "MXRF11.SA"
+
 with st.sidebar:
     st.markdown(
         f"""
@@ -660,6 +674,68 @@ with st.sidebar:
         ["Análise de ativos", "Conteúdos educativos", "Sobre a Bússola"],
         label_visibility="collapsed",
     )
+
+    if pagina == "Análise de ativos":
+        st.markdown("---")
+        st.markdown("**Ativos da B3**")
+        categoria_ativo = st.segmented_control(
+            "Categoria",
+            ["Ações", "FIIs"],
+            default="FIIs",
+            label_visibility="collapsed",
+        )
+        tipo_api = "stock" if categoria_ativo == "Ações" else "fii"
+
+        try:
+            ativos = listar_ativos_b3(tipo_api)
+            filtro_ativos = st.text_input(
+                "Filtrar por ticker ou nome",
+                placeholder="Ex.: PETR4 ou Petrobras",
+                key="filtro_ativos_b3",
+            ).strip().casefold()
+            ativos_filtrados = [
+                ativo
+                for ativo in ativos
+                if filtro_ativos in ativo["ticker"].casefold()
+                or filtro_ativos in ativo["name"].casefold()
+            ]
+
+            if ativos_filtrados:
+                tickers = [ativo["ticker"] for ativo in ativos_filtrados]
+                nomes = {ativo["ticker"]: ativo["name"] for ativo in ativos_filtrados}
+                chave_widget = f"ativo_b3_{tipo_api}"
+                ticker_atual = st.session_state.get("ticker_input", "MXRF11.SA")
+                ticker_atual = ticker_atual.upper().removesuffix(".SA")
+                ticker_salvo = st.session_state.get(chave_widget, ticker_atual)
+                indice = tickers.index(ticker_salvo) if ticker_salvo in tickers else 0
+
+                ticker_selecionado = st.selectbox(
+                    "Selecionar ativo",
+                    options=tickers,
+                    index=indice,
+                    format_func=lambda ticker: f"{ticker} · {nomes[ticker]}",
+                    key=chave_widget,
+                    on_change=sincronizar_ticker_selecionado,
+                    args=(chave_widget,),
+                )
+
+                if st.session_state.get("_categoria_ativos_anterior") != categoria_ativo:
+                    st.session_state["_categoria_ativos_anterior"] = categoria_ativo
+                    st.session_state["ticker_input"] = f"{ticker_selecionado}.SA"
+
+                st.caption(f"{len(ativos_filtrados)} ativos encontrados")
+            else:
+                st.info("Nenhum ativo encontrado para esse filtro.")
+        except Exception as e:
+            st.warning("Não foi possível carregar a lista da B3. Informe o ticker manualmente.")
+            with st.expander("Detalhes da lista"):
+                st.exception(e)
+
+        with st.expander("Dica rápida"):
+            if categoria_ativo == "FIIs":
+                st.caption("FIIs investem em imóveis ou títulos imobiliários. Rendimentos não são garantidos.")
+            else:
+                st.caption("Ao comprar uma ação, você se torna sócio de uma empresa e participa dos riscos do negócio.")
 
     st.markdown(
         """
@@ -698,25 +774,16 @@ if pagina == "Análise de ativos":
             unsafe_allow_html=True,
         )
 
-    sc1, sc2 = st.columns([5.5, 1], gap="small")
-
-    with sc1:
-        ticker = st.text_input(
-            "Ticker",
-            value="MXRF11.SA",
-            placeholder="Busque pelo nome ou ticker",
-            label_visibility="collapsed",
-        )
-        st.markdown(
-            '<div class="search-caption">Busque pelo nome ou ticker.</div>',
-            unsafe_allow_html=True,
-        )
-
-    with sc2:
-        analisar = st.button(
-            "Analisar ativo  →",
-            type="primary",
-        )
+    ticker = st.text_input(
+        "Ticker",
+        placeholder="Busque pelo nome ou ticker",
+        key="ticker_input",
+        label_visibility="collapsed",
+    )
+    st.markdown(
+        '<div class="search-caption">Selecione um ativo na lateral ou digite um ticker.</div>',
+        unsafe_allow_html=True,
+    )
 
     deve_renderizar = True
 
@@ -919,47 +986,74 @@ if pagina == "Análise de ativos":
 elif pagina == "Conteúdos educativos":
     st.markdown('<h1 class="page-title">Conteúdos educativos</h1>', unsafe_allow_html=True)
     st.markdown(
-        '<p class="page-subtitle">Aprenda o básico antes de analisar.</p>',
+        '<p class="page-subtitle">Conceitos essenciais para entender os ativos e seus riscos.</p>',
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        """
-        <div class="card panel" style="min-height:auto;margin-bottom:1rem;">
-            <p class="card-title">O que é um FII?</p>
-            <p class="card-sub" style="margin-bottom:0;">
-                Fundo Imobiliário: um "condomínio" de investidores que aplica em imóveis
-                ou títulos do setor. Muitos distribuem rendimentos mensais aos cotistas.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    aba_acoes, aba_fiis, aba_etfs_bdrs, aba_riscos = st.tabs(
+        ["Ações", "FIIs", "ETFs e BDRs", "Riscos"]
     )
 
-    st.markdown(
-        """
-        <div class="card panel" style="min-height:auto;margin-bottom:1rem;">
-            <p class="card-title">Ação vs. FII</p>
-            <p class="card-sub" style="margin-bottom:0;">
-                Ação é um pedaço de uma empresa; FII é um pedaço de uma carteira imobiliária.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    with aba_acoes:
+        st.markdown(
+            """
+            <div class="card panel" style="min-height:auto;">
+                <p class="card-title">O que é uma ação?</p>
+                <p class="card-sub" style="margin-bottom:0;">
+                    É uma fração do capital de uma empresa. Quem compra ações torna-se
+                    acionista e fica exposto aos resultados, às decisões e às oscilações
+                    de preço da companhia. Dividendos podem ocorrer, mas não são garantidos.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    st.markdown(
-        """
-        <div class="card panel" style="min-height:auto;">
-            <p class="card-title">O que a IA analisa aqui?</p>
-            <p class="card-sub" style="margin-bottom:0;">
-                Ela recebe os dados do ativo e produz um resumo com pontos fortes,
-                riscos e um veredito educacional.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    with aba_fiis:
+        st.markdown(
+            """
+            <div class="card panel" style="min-height:auto;">
+                <p class="card-title">O que é um FII?</p>
+                <p class="card-sub" style="margin-bottom:0;">
+                    Um Fundo de Investimento Imobiliário reúne recursos para investir
+                    em imóveis ou ativos ligados ao setor. As cotas são negociadas na
+                    bolsa. Rendimentos e valor das cotas variam e não são garantidos.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with aba_etfs_bdrs:
+        st.markdown(
+            """
+            <div class="card panel" style="min-height:auto;">
+                <p class="card-title">ETFs e BDRs</p>
+                <p class="card-sub" style="margin-bottom:0;">
+                    ETFs são fundos negociados em bolsa que buscam acompanhar um índice
+                    ou estratégia. BDRs representam valores mobiliários emitidos no
+                    exterior e negociados no Brasil. Ambos têm riscos de mercado; BDRs
+                    também podem variar com o câmbio.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with aba_riscos:
+        st.markdown(
+            """
+            <div class="card panel" style="min-height:auto;">
+                <p class="card-title">Antes de investir</p>
+                <p class="card-sub" style="margin-bottom:0;">
+                    Preço passado não garante retorno futuro. Considere liquidez,
+                    diversificação, custos, horizonte de investimento e sua tolerância
+                    a perdas. A análise gerada por IA é informativa, não é recomendação.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 # ============================================================
 # PÁGINA: SOBRE A BÚSSOLA

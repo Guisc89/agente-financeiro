@@ -44,6 +44,25 @@ class FallbackDataProviderTests(unittest.TestCase):
 
 
 class BrapiProviderTests(unittest.TestCase):
+    @patch("providers.json.load")
+    @patch("providers.urlopen")
+    def test_lists_assets_by_category_without_authentication(self, mocked_urlopen, mocked_json_load):
+        mocked_urlopen.return_value.__enter__.return_value = Mock()
+        mocked_json_load.return_value = {
+            "stocks": [
+                {"stock": "MXRF11", "name": "MXRF11", "subType": "fii"},
+                {"stock": "HGLG11", "name": "HGLG11", "subType": "fii"},
+            ]
+        }
+
+        assets = BrapiProvider().list_b3_assets("fii")
+        request = mocked_urlopen.call_args.args[0]
+
+        self.assertEqual(assets[0], {"ticker": "MXRF11", "name": "MXRF11"})
+        self.assertIn("type=fund", request.full_url)
+        self.assertIn("subType=fii", request.full_url)
+        self.assertNotIn("Authorization", request.headers)
+
     @patch.dict(os.environ, {"BRAPI_TOKEN": "test-token"})
     @patch("providers.json.load")
     @patch("providers.urlopen")
