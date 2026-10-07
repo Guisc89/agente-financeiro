@@ -1,10 +1,10 @@
-from providers import YahooFinanceProvider
+from providers import FallbackDataProvider
 from llm_providers import GroqClient
 from agent_core import FinancialAgent
 
 if __name__ == "__main__":
     # 1. Instanciamos as dependências concretas
-    data_provider = YahooFinanceProvider()
+    data_provider = FallbackDataProvider()
     llm_client = GroqClient() # Usando a Groq agora!
     
     # 2. Injetamos tudo no nosso Agente

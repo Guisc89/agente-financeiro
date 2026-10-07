@@ -13,6 +13,7 @@ class AssetQuote:
     previous_close: float
     market_cap: Optional[float] = None
     sector: Optional[str] = None
+    source: str = "Yahoo Finance"
     
     @property
     def daily_variation_percent(self) -> float:

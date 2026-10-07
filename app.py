@@ -1,6 +1,6 @@
 import streamlit as st
 import datetime as dt
-from providers import YahooFinanceProvider
+from providers import FallbackDataProvider
 from llm_providers import GroqClient
 from agent_core import FinancialAgent
 
@@ -9,6 +9,8 @@ import os
 try:
     if "GROQ_API_KEY" in st.secrets:
         os.environ.setdefault("GROQ_API_KEY", st.secrets["GROQ_API_KEY"])
+    if "BRAPI_TOKEN" in st.secrets:
+        os.environ.setdefault("BRAPI_TOKEN", st.secrets["BRAPI_TOKEN"])
 except Exception:
     pass
 
@@ -563,14 +565,14 @@ st.markdown(
 # ============================================================
 @st.cache_data(ttl=600, show_spinner=False)
 def buscar_dados(ticker: str):
-    provider = YahooFinanceProvider()
+    provider = FallbackDataProvider()
     return provider.get_asset_quote(ticker)
 
 
 @st.cache_resource(show_spinner=False)
 def criar_agente():
     return FinancialAgent(
-        data_provider=YahooFinanceProvider(),
+        data_provider=FallbackDataProvider(),
         llm_client=GroqClient(),
     )
 
@@ -579,10 +581,10 @@ def criar_agente():
 def analisar_com_ia(ticker: str):
     """Análise cacheada por 10 min: evita chamar a Groq a cada rerun."""
     agent = FinancialAgent(
-        data_provider=YahooFinanceProvider(),
+        data_provider=FallbackDataProvider(),
         llm_client=GroqClient(),
     )
-    quote = YahooFinanceProvider().get_asset_quote(ticker)
+    quote = FallbackDataProvider().get_asset_quote(ticker)
     return agent.run_analysis(ticker, quote=quote)
 
 
@@ -753,8 +755,8 @@ if pagina == "Análise de ativos":
 
             with ac2:
                 st.markdown(
-                    """
-                    <div class="top-note">ⓘ <span>Dados: Yahoo Finance • Análise gerada por IA.</span></div>
+                    f"""
+                    <div class="top-note">ⓘ <span>Dados: {quote.source} • Análise gerada por IA.</span></div>
                     """,
                     unsafe_allow_html=True,
                 )
@@ -974,7 +976,7 @@ elif pagina == "Sobre a Bússola":
         <div class="card panel" style="min-height:auto;margin-bottom:1rem;">
             <p class="card-title">Arquitetura</p>
             <p class="card-sub" style="margin-bottom:0;">
-                Camada de dados (Yahoo Finance) → Camada de inteligência (IA via Groq) →
+                Camada de dados (Yahoo Finance com fallback Brapi) → Camada de inteligência (IA via Groq) →
                 Camada de apresentação (Streamlit), unidas por um agente orquestrador.
             </p>
         </div>
@@ -988,7 +990,7 @@ elif pagina == "Sobre a Bússola":
             <p class="card-title">Tecnologias</p>
             <p class="card-sub" style="margin-bottom:0;">
                 Python • Orientação a Objetos • Pydantic • Streamlit • Groq •
-                yfinance • Plotly
+                yfinance • Brapi • Plotly
             </p>
         </div>
         """,
