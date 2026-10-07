@@ -17,4 +17,4 @@ riscos e veredito — em uma interface web profissional.
 
 Camadas desacopladas com princípios **SOLID**:
 
-Configure `BRAPI_TOKEN` no ambiente ou em `.streamlit/secrets.toml` para autenticar as consultas à Brapi. Sem token, a API permite apenas os ativos e limites definidos no plano gratuito.
+Configure `BRAPI_TOKEN` no ambiente ou em `.streamlit/secrets.toml` para autenticar as consultas à Brapi. No Streamlit Community Cloud, adicione `BRAPI_TOKEN = "seu_token"` em **App settings → Secrets**. Sem token, a API permite apenas os ativos e limites definidos no plano gratuito.

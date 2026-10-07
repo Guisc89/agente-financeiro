@@ -3,6 +3,7 @@ import json
 import os
 from typing import List, Optional
 from urllib.parse import quote
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import yfinance as yf
@@ -80,6 +81,16 @@ class BrapiProvider(DataProvider):
                 sector=info.get("sector"),
                 source=self.source_name,
             )
+        except HTTPError as e:
+            if e.code == 401:
+                detail = (
+                    "HTTP 401: token ausente ou inválido. Configure BRAPI_TOKEN "
+                    "nas Secrets do Streamlit Cloud ou no ambiente local."
+                )
+                raise ValueError(
+                    f"Erro ao buscar dados na Brapi para o ticker {ticker}: {detail}"
+                ) from e
+            raise ValueError(f"Erro ao buscar dados na Brapi para o ticker {ticker}: {e}") from e
         except Exception as e:
             raise ValueError(f"Erro ao buscar dados na Brapi para o ticker {ticker}: {e}") from e
 

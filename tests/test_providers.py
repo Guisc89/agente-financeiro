@@ -1,5 +1,6 @@
 import os
 import unittest
+from urllib.error import HTTPError
 from unittest.mock import Mock, patch
 
 from models import AssetQuote
@@ -69,6 +70,12 @@ class BrapiProviderTests(unittest.TestCase):
         self.assertEqual(quote.current_price, 36.5)
         self.assertEqual(quote.previous_close, 36.0)
         self.assertEqual(quote.source, "Brapi")
+
+    @patch("providers.urlopen", side_effect=HTTPError("https://brapi.dev", 401, "Unauthorized", {}, None))
+    def test_explains_unauthorized_token(self, mocked_urlopen):
+        with patch.dict(os.environ, {"BRAPI_TOKEN": "test-token"}):
+            with self.assertRaisesRegex(ValueError, "Configure BRAPI_TOKEN"):
+                BrapiProvider().get_asset_quote("MXRF11.SA")
 
 
 if __name__ == "__main__":
