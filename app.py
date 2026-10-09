@@ -528,7 +528,6 @@ st.markdown(
     }
 
     #MainMenu,
-    header[data-testid="stHeader"],
     footer{
         visibility:hidden;
     }
